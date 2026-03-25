@@ -3,7 +3,7 @@
 SynthLoc is a lightweight, optimized React Native application designed to persistently mock GPS coordinates, specifically tailored for entry-level devices like the Samsung Galaxy A07. It uses a modern Native Android Foreground Service to interface with the `FusedLocationProviderClient` for battery-efficient and reliable background tracking.
 
 ## Architecture Highlights
-*   **Map UI:** Utilizes `react-native-maps` bridging to the native Google Maps SDK for high performance.
+*   **Map UI:** Utilizes `react-native-webview` with **Leaflet.js** and **OpenStreetMap** for a fully free, keyless mapping solution.
 *   **Mocking Engine:** A custom Android Foreground Service (`MockLocationService`) that prevents the OS from killing the location spoofing loop.
 *   **System Synchronization:** Injects high-precision timing (`setElapsedRealtimeNanos()`) into synthetic `Location` objects to ensure compatibility with modern Android OS anti-spoofing requirements.
 
@@ -15,13 +15,7 @@ SynthLoc is a lightweight, optimized React Native application designed to persis
     cd synth-loc
     ```
 
-2.  **Google Maps API Key:**
-    You must provide a valid Google Maps API Key to render the map interface.
-    *   Open `android/app/src/main/AndroidManifest.xml`.
-    *   Locate the `<meta-data>` tag for `com.google.android.geo.API_KEY`.
-    *   Replace `"YOUR_GOOGLE_MAPS_API_KEY_HERE"` with your actual key.
-
-3.  **Install Node Dependencies:**
+2.  **Install Node Dependencies:**
     ```bash
     npm install
     ```

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,8 +7,10 @@ import {
   View,
   NativeModules,
   Alert,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 
 const { MockLocationModule } = NativeModules;
 
@@ -19,13 +21,35 @@ function App(): React.JSX.Element {
     longitude: number;
   } | null>(null);
 
-  const handleMapPress = (e: any) => {
-    if (mockingActive) {
-      Alert.alert('Cannot move pin', 'Please stop mocking before selecting a new location.');
-      return;
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Warning',
+            'Background spoofing requires notification permissions to stay alive.'
+          );
+        }
+      }
+    };
+    requestNotificationPermission();
+  }, []);
+
+  const handleMapMessage = (event: any) => {
+    try {
+      if (mockingActive) {
+        // Technically we can ignore updates if mocking is active, or we just warn
+        // We'll just silently ignore setting location while active to match previous logic
+        return;
+      }
+      const { lat, lng } = JSON.parse(event.nativeEvent.data);
+      setSelectedLocation({ latitude: lat, longitude: lng });
+    } catch (error) {
+      console.error('Failed to parse coordinates from map', error);
     }
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setSelectedLocation({ latitude, longitude });
   };
 
   const toggleMocking = () => {
@@ -42,23 +66,66 @@ function App(): React.JSX.Element {
     }
   };
 
+  const defaultLat = 14.6465;
+  const defaultLng = 121.0568;
+  const initLat = selectedLocation ? selectedLocation.latitude : defaultLat;
+  const initLng = selectedLocation ? selectedLocation.longitude : defaultLng;
+
+  const mapHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+            body { padding: 0; margin: 0; background-color: #f0f0f0; }
+            #map { height: 100vh; width: 100vw; }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            var map = L.map('map', { zoomControl: false }).setView([${initLat}, ${initLng}], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            var marker = L.marker([${initLat}, ${initLng}], {draggable: true}).addTo(map);
+
+            function sendLocation(lat, lng) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ lat: lat, lng: lng }));
+                }
+            }
+
+            map.on('click', function(e) {
+                marker.setLatLng(e.latlng);
+                sendLocation(e.latlng.lat, e.latlng.lng);
+            });
+
+            marker.on('dragend', function(e) {
+                var position = marker.getLatLng();
+                sendLocation(position.lat, position.lng);
+            });
+        </script>
+    </body>
+    </html>
+  `;
+
   return (
     <SafeAreaView style={styles.container}>
-      <MapView
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
-        initialRegion={{
-          latitude: 37.78825,
-          longitude: -122.4324,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }}
-        onPress={handleMapPress}
-      >
-        {selectedLocation && (
-          <Marker coordinate={selectedLocation} title="Mock Location" />
-        )}
-      </MapView>
+      <View style={styles.mapContainer}>
+        <WebView
+          source={{ html: mapHTML }}
+          onMessage={handleMapMessage}
+          scrollEnabled={false}
+          bounces={false}
+          style={styles.map}
+        />
+      </View>
       <View style={styles.overlay}>
         <View style={styles.statusBox}>
           <Text style={styles.statusText}>
@@ -86,9 +153,14 @@ function App(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  mapContainer: {
+    ...StyleSheet.absoluteFillObject,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     position: 'absolute',
@@ -98,7 +170,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     padding: 15,
     borderRadius: 10,
     width: '100%',
