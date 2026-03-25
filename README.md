@@ -31,8 +31,17 @@ SynthLoc is a lightweight, optimized React Native application designed to persis
     *   Navigate to **Developer Options** -> **Select mock location app**.
     *   Select **SynthLoc**.
 
-5.  **Build and Deploy:**
-    Connect your device via ADB and run:
+5.  **Build the APK (Linux / ADB):**
+    If you want to package the app into a standalone APK:
+    ```bash
+    cd android
+    ./gradlew assembleDebug
+    ```
+    The built APK will be located at:
+    `android/app/build/outputs/apk/debug/app-debug.apk`
+
+6.  **Direct Deployment (Optional):**
+    If your Android device is already connected via ADB, you can build and install it natively in one step:
     ```bash
     npm run android
     ```
