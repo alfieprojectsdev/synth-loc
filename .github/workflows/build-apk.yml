@@ -1,0 +1,46 @@
+name: Build Android APK
+
+# This tells GitHub WHEN to run the build
+on:
+  push:
+    branches: [ "main", "feature/osm-keyless-map" ] # Runs automatically when you push to these branches
+  workflow_dispatch: # IMPORTANT: This allows you to click a button on GitHub to build manually
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest # GitHub provides a free Linux server
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use the Node version you have locally
+          cache: 'npm'
+
+      - name: ☕ Set up Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17' # React Native 0.73+ requires Java 17
+
+      - name: 📦 Install npm dependencies
+        run: npm install
+
+      - name: 🔨 Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: 🚀 Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 📤 Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7 # GitHub will store the file for 7 days
